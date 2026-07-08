@@ -1,0 +1,13 @@
+# 个人数据 —— 千万不要提交这些！
+ai_config.json
+signatures.json
+signature.txt
+lcu_diag.txt
+
+# 编译产物 —— 不进仓库历史，发布时走 GitHub Releases 附件
+*.exe
+
+# 系统/编辑器杂项
+Thumbs.db
+.DS_Store
+*.log
