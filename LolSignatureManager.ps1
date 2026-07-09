@@ -417,6 +417,48 @@ function Get-WeatherRaw {
 # ---------- 战绩读取（走 curl，避开 .NET 的 TLS 问题；写临时文件按 UTF-8 读，避免中文乱码）----------
 $script:CurlPath = Join-Path $env:WINDIR 'System32\curl.exe'
 $script:ChampMap = $null
+$script:ChampAlias = $null
+
+# 英雄「玩家口头昵称」表：键为客户端返回的英文 alias，值为国服玩家真正的叫法。
+# 国服 champion-summary.json 的 name 字段是称号（如"北地之怒""无极剑圣"），玩家其实叫"猪妹""剑圣"。
+# 表里没有的英雄会回退到称号。
+$script:ChampNick = @{
+    'Annie'='安妮'; 'Olaf'='奥拉夫'; 'Galio'='加里奥'; 'TwistedFate'='卡牌'; 'XinZhao'='赵信'; 'Urgot'='厄加特';
+    'Leblanc'='妖姬'; 'Vladimir'='吸血鬼'; 'FiddleSticks'='稻草人'; 'Kayle'='天使'; 'MasterYi'='剑圣'; 'Alistar'='牛头';
+    'Ryze'='瑞兹'; 'Sion'='塞恩'; 'Sivir'='希维尔'; 'Soraka'='索拉卡'; 'Teemo'='提莫'; 'Tristana'='小炮'; 'Warwick'='狼人';
+    'Nunu'='努努'; 'MissFortune'='女枪'; 'Ashe'='寒冰'; 'Tryndamere'='蛮王'; 'Jax'='武器'; 'Morgana'='莫甘娜';
+    'Zilean'='时光老头'; 'Singed'='炼金'; 'Evelynn'='伊芙琳'; 'Twitch'='老鼠'; 'Karthus'='死歌'; 'Chogath'='大虫子';
+    'Amumu'='木乃伊'; 'Rammus'='龟'; 'Anivia'='冰鸟'; 'Shaco'='小丑'; 'DrMundo'='蒙多'; 'Sona'='娑娜'; 'Kassadin'='卡萨丁';
+    'Irelia'='刀妹'; 'Janna'='风女'; 'Gangplank'='船长'; 'Corki'='飞机'; 'Karma'='卡尔玛'; 'Taric'='宝石'; 'Veigar'='小法';
+    'Trundle'='巨魔'; 'Swain'='乌鸦'; 'Caitlyn'='女警'; 'Blitzcrank'='机器人'; 'Malphite'='石头人'; 'Katarina'='卡特';
+    'Nocturne'='魔腾'; 'Maokai'='大树'; 'Renekton'='鳄鱼'; 'JarvanIV'='皇子'; 'Elise'='蜘蛛'; 'Orianna'='发条';
+    'MonkeyKing'='猴子'; 'Brand'='火男'; 'LeeSin'='瞎子'; 'Vayne'='VN'; 'Rumble'='兰博'; 'Cassiopeia'='蛇女';
+    'Skarner'='蝎子'; 'Heimerdinger'='大头'; 'Nasus'='狗头'; 'Nidalee'='豹女'; 'Udyr'='武当'; 'Poppy'='波比';
+    'Gragas'='酒桶'; 'Pantheon'='潘森'; 'Ezreal'='EZ'; 'Mordekaiser'='铁男'; 'Yorick'='掘墓人'; 'Akali'='阿卡丽';
+    'Kennen'='肯南'; 'Garen'='盖伦'; 'Leona'='日女'; 'Malzahar'='马尔扎哈'; 'Talon'='男刀'; 'Riven'='锐雯'; 'KogMaw'='大嘴';
+    'Shen'='慎'; 'Lux'='光辉'; 'Xerath'='泽拉斯'; 'Shyvana'='龙女'; 'Ahri'='阿狸'; 'Graves'='男枪'; 'Fizz'='小鱼人';
+    'Volibear'='雷熊'; 'Rengar'='狮子狗'; 'Varus'='韦鲁斯'; 'Nautilus'='泰坦'; 'Viktor'='维克托'; 'Sejuani'='猪妹';
+    'Fiora'='剑姬'; 'Ziggs'='炸弹人'; 'Lulu'='璐璐'; 'Draven'='德莱文'; 'Hecarim'='人马'; 'Khazix'='螳螂'; 'Darius'='诺手';
+    'Jayce'='杰斯'; 'Lissandra'='冰女'; 'Diana'='皎月'; 'Quinn'='奎因'; 'Syndra'='辛德拉'; 'AurelionSol'='龙王';
+    'Kayn'='凯隐'; 'Zoe'='佐伊'; 'Zyra'='婕拉'; 'Kaisa'='卡莎'; 'Seraphine'='萨勒芬妮'; 'Gnar'='纳尔'; 'Zac'='扎克';
+    'Yasuo'='亚索'; 'Velkoz'='大眼'; 'Taliyah'='岩雀'; 'Camille'='青钢影'; 'Akshan'='阿克尚'; 'Belveth'='虚空女皇';
+    'Braum'='布隆'; 'Jhin'='戏命师'; 'Kindred'='千珏'; 'Zeri'='泽丽'; 'Jinx'='金克丝'; 'TahmKench'='蛤蟆'; 'Briar'='布莱尔';
+    'Viego'='破败王'; 'Senna'='赛娜'; 'Lucian'='卢锡安'; 'Zed'='劫'; 'Kled'='克烈'; 'Ekko'='艾克'; 'Qiyana'='奇亚娜';
+    'Vi'='蔚'; 'Aatrox'='剑魔'; 'Nami'='娜美'; 'Azir'='皇帝'; 'Yuumi'='悠米'; 'Samira'='莎弥拉'; 'Thresh'='锤石';
+    'Illaoi'='俄洛伊'; 'RekSai'='挖掘机'; 'Ivern'='艾翁'; 'Kalista'='卡莉丝塔'; 'Bard'='巴德'; 'Rakan'='洛'; 'Xayah'='霞';
+    'Ornn'='奥恩'; 'Sylas'='塞拉斯'; 'Neeko'='妮蔻'; 'Aphelios'='厄斐琉斯'; 'Rell'='芮尔'; 'Pyke'='派克'; 'Vex'='薇古丝';
+    'Yone'='永恩'; 'Sett'='腕豪'; 'Lillia'='莉莉娅'; 'Gwen'='格温'; 'Renata'='烈娜塔'; 'Aurora'='奥罗拉'; 'Nilah'='尼菈';
+    'KSante'='奎桑提'; 'Smolder'='斯莫德'; 'Milio'='米利欧'; 'Hwei'='彗'; 'Naafiri'='纳亚菲利'; 'Ambessa'='安蓓萨'; 'Mel'='梅尔'
+}
+# 用英雄 id 拿到最贴切的叫法：优先玩家昵称，没有则回退称号，再没有则"某英雄"。
+function Get-ChampNick {
+    param($id)
+    $sid = [string]$id
+    $alias = if ($script:ChampAlias) { [string]$script:ChampAlias[$sid] } else { '' }
+    if ($alias -and $script:ChampNick.ContainsKey($alias)) { return $script:ChampNick[$alias] }
+    if ($script:ChampMap -and $script:ChampMap[$sid]) { return $script:ChampMap[$sid] }
+    return '某英雄'
+}
 
 function Get-LcuAuth {
     $cred = Get-LcuCredentials
@@ -445,8 +487,9 @@ function Get-ChampMap {
     if ($script:ChampMap) { return $script:ChampMap }
     $arr = Get-LcuJson $Port $Auth '/lol-game-data/assets/v1/champion-summary.json'
     $m = @{}
-    if ($arr) { foreach ($c in $arr) { $m[[string]$c.id] = $c.name } }
-    if ($m.Count -gt 0) { $script:ChampMap = $m }
+    $al = @{}
+    if ($arr) { foreach ($c in $arr) { $m[[string]$c.id] = $c.name; $al[[string]$c.id] = [string]$c.alias } }
+    if ($m.Count -gt 0) { $script:ChampMap = $m; $script:ChampAlias = $al }
     return $m
 }
 
@@ -587,6 +630,23 @@ function New-MatchLine {
                 "$champ 尽力了555 $kda 也没能赢 qwq"))
         }
     }
+
+    # 海克斯大乱斗等非经典模式：追加一些贴合模式的口语文案（一波/脆皮/三选一/后期成型/开团）
+    if (-not $IsClassic) {
+        if ($win) {
+            $pool.AddRange([string[]]@(
+                "$champ 这波一波带走对面，$kda 爽 (≧▽≦)",
+                "$champ 后期成型，一个人平A穿俩，$kda 😎",
+                "三选一抽到神装，$champ 直接起飞🔥",
+                "$champ 开团开得好，团灭对面拿下这把💪"))
+        } else {
+            $pool.AddRange([string[]]@(
+                "$champ 脆皮一进场就被$fed 秒了，绷不住 (╥﹏╥)",
+                "抽到$champ 又没抽到好强化，这把开摆了 >.<",
+                "对面$fed 太肥，我方一波团全没了，可恶",
+                "$champ $kda 尽力了，队友莽夫送到投 qwq"))
+        }
+    }
     return (Get-Random -InputObject $pool)
 }
 
@@ -624,14 +684,13 @@ function Get-MatchSignature {
     foreach ($p in $detail.participants) { if ($pidToPuuid[[string]$p.participantId] -eq $me.puuid) { $mine = $p; break } }
     if (-not $mine) { return @{ ok = $false; msg = '没在这局里找到你的数据' } }
 
-    $champ = $champMap[[string]$mine.championId]; if (-not $champ) { $champ = '我' }
+    $champ = Get-ChampNick $mine.championId   # 用玩家口头昵称（剑圣/猪妹），而非客户端的称号
     $s = $mine.stats
     $k = [int]$s.kills; $d = [int]$s.deaths; $as = [int]$s.assists
     $win = [bool]$s.win
     $enemies = $detail.participants | Where-Object { $_.teamId -ne $mine.teamId }
     $fed = $enemies | Sort-Object { $_.stats.kills } -Descending | Select-Object -First 1
-    $fedName = if ($fed) { $champMap[[string]$fed.championId] } else { '对面' }
-    if (-not $fedName) { $fedName = '对面' }
+    $fedName = if ($fed) { Get-ChampNick $fed.championId } else { '对面' }
 
     # 更丰富的数据（这些字段各服/各模式基本都在）
     $maxMulti = [int]$s.largestMultiKill
@@ -745,33 +804,62 @@ function Invoke-Ai {
 
 # ModeName/IsClassic 用于按实际游玩模式选词。
 # Win：$null 表示这次没有真实对局结果（时间/天气场景，不该编造输赢）；$true/$false 表示这次确有真实胜负（战绩场景），情绪要贴合这个真实结果。
+# 用较强的提示词「驾驭」较弱的免费模型（如智谱GLM）：给人设 + 灌游戏知识 + 给范例(few-shot) + 把输出约束死。
 function Get-AiInspiration {
     param([string]$Facts, [string]$ModeName = '', [bool]$IsClassic = $true, [object]$Win = $null)
     $vibe = Get-Random -InputObject @('热血中二', 'emo伤感', '可爱软萌', '嚣张拽炫', '佛系chill', '阴阳怪气吐槽')
 
+    # 选词规则
     if ($IsClassic) {
-        $vocabRule = "多使用召唤师、峡谷、上分/掉分、排位、开黑、大龙/小龙、水晶、五杀、走位、团战 这类贴合英雄联盟本身的词汇"
+        $vocabRule = "多用召唤师、峡谷、上分/掉分、排位、开黑、大龙/小龙、越塔、团战、五杀 这类经典排位常说的词"
     } else {
-        $vocabRule = "多使用名次、组队、开黑、乱斗、强化、团战、队友 这类更通用或符合这个模式氛围的词汇（这局不是经典召唤师峡谷排位模式，峡谷、上分、排位、大龙、小龙、水晶、补刀这类词换掉不用）"
+        $vocabRule = "多用一波、开团、莽、白给、送、脆皮、秒人、后期成型、混子、躺、名次、强化、团战 这类词；这局不是经典排位，别用「峡谷、上分、排位、大龙、小龙、水晶、补刀」这些词"
     }
 
+    # 灌输这个模式到底怎么玩，让弱模型也能写出「内行感」
+    if ($IsClassic) {
+        $modeKnowledge = "经典召唤师峡谷5v5：分上单/打野/中单/射手/辅助，要补刀攒钱买装备、打大龙小龙、抓人gank、越塔推塔，赢了上分、输了掉分。"
+    } elseif ($ModeName -match '乱斗|嚎哭|ARAM') {
+        $modeKnowledge = "大乱斗类模式（嚎哭深渊单线5v5）：英雄随机分配不能选、不能自由回城补给、全程贴脸连续团战、脆皮很容易被秒、常常一波团就定胜负、能中途投降。海克斯大乱斗还会在局中不断「三选一」拿强化，抽到什么英雄和强化很看运气。真实玩家常挂在嘴边：一波、开团、莽、白给、送、脆皮、秒人、AOE、后期成型、混子、躺、投了、三选一。"
+    } else {
+        $mn = if ($ModeName) { $ModeName } else { '这个娱乐模式' }
+        $modeKnowledge = "这局是「$mn」这种娱乐/特殊模式，不是经典排位，请按它实际的玩法和氛围写，别套用排位上分那一套。"
+    }
+
+    # 情绪基调 + 对应的几个「语气范例」（few-shot，弱模型靠模仿范例效果最好）
     if ($null -eq $Win) {
-        $resultRule = "这不是在描述某一局具体比赛的输赢结果，请只结合上面的时间/天气本身，营造一种想开黑/想上号打游戏的心情和氛围，不要提及连胜、连败、这局输了/赢了之类你并不知道的战绩信息"
+        $resultRule = "这句不是在说某一局的输赢（你并不知道最近战绩），只借时间/天气烘托一种想开黑、想上号打两把的心情，绝对不要提连胜连败或这局输赢。"
+        $examples = @(
+            '深夜一个人挂着大乱斗，图一乐 (._.)',
+            '下雨天窝家里连开几把，输赢无所谓啦~',
+            '今天状态在线，感觉能莽好几把🔥')
     } elseif ($Win) {
-        $resultRule = "这一局真实赢了，请表达痛快、兴奋这类正面情绪，可以用『爽！』『战斗爽！』这种短促痛快的感叹句式，只针对这一局说，不要提连胜"
+        $resultRule = "这一局真赢了，写出那种痛快、上头、想嘚瑟的正面情绪，可以短促点，只说这一局、别提连胜。"
+        $examples = @(
+            '剑圣后期绕后一个大四杀，爽到跳起来 (≧▽≦)',
+            '猪妹大招开进人堆，这波直接把对面团灭了🔥',
+            '前期4/9后期成型，一个人平A穿俩，谁懂啊😎')
     } else {
-        $resultRule = "这一局真实输了，请表达带点小情绪但可爱/卖萌卖惨的负面情绪，可以用『可恶』『呜呜呜』这类词，只针对这一局说，不要提连败"
+        $resultRule = "这一局真输了，写出带点小情绪、但可爱卖萌卖惨的负面感（别真的骂人），只说这一局、别提连败。"
+        $examples = @(
+            '对面卡特一进人堆就五杀，我方全脆皮，绷不住 (╥﹏╥)',
+            '又是抽到辅助混子的一天，被队友莽夫带走 QAQ',
+            '石头人R开我脸上，还没输出人就没了，可恶 >.<')
     }
+    $exampleText = (($examples | ForEach-Object { "- $_" }) -join "`n")
 
-    $prompt = "你是一个爱玩《英雄联盟》(League of Legends)的中国年轻玩家，正在给国服LOL客户端设置个性签名。`n" +
-              "$Facts`n" +
-              "请写一句可以直接当这个游戏内个性签名的话，整体风格偏「$vibe」。`n" +
-              "写作要求：`n" +
-              "1. $vocabRule；`n" +
-              "2. $resultRule；`n" +
-              "3. 如果上面给了具体的对局数据（英雄、KDA、多杀等）可以真实引用，用你确定真实存在的英雄/装备名字；不确定是否真实存在的具体强化/装备/技能名字就不要编，用『强化』『装备』这类通用说法即可；也不要把具体的游戏模式名称原文写进这句话里（比如不要出现「海克斯大乱斗」这几个字本身）；`n" +
-              "4. 可以用『>.<』『qwq』『555』『(≧▽≦)』『(╥﹏╥)』这类中文/日式颜文字，或者常规emoji，不要用『;)』这类中文语境里少见的西式颜文字；`n" +
-              "5. 中文，22字以内，直接输出这一句话本身，不要引号，不要任何解释或前后缀。"
+    $prompt = "你是个骨灰级的国服《英雄联盟》老玩家，说话像贴吧和游戏里真实玩家那样：口语、懂梗、有情绪、不端着、不官方。现在要给自己想一句游戏内个性签名。`n`n" +
+              "【背景信息】`n$Facts`n`n" +
+              "【这个模式怎么玩】（帮你用对词、写出内行感）`n$modeKnowledge`n`n" +
+              "【这次的情绪基调】$resultRule`n`n" +
+              "【想要的风格】整体偏「$vibe」，但别为了凑风格牺牲真实感。`n`n" +
+              "【语气示范】（只体会这种真实、口语、有梗有情绪的感觉，绝对不要照抄里面的英雄和句子）`n$exampleText`n`n" +
+              "【硬性规则，逐条照做】`n" +
+              "1. 英雄一律用玩家口头叫法（猪妹、剑圣、EZ、诺手、大嘴 这种）——【背景信息】里给的英雄名已经是正确叫法，直接照用，别自己换成称号或全名；`n" +
+              "2. $vocabRule；`n" +
+              "3. 别把模式名字（如「海克斯大乱斗」）原样写进句子；不确定真实存在的强化/装备/技能名字就不要编，用「强化」「装备」这种通用词代替；`n" +
+              "4. 颜文字用中/日式（>.<、qwq、555、(≧▽≦)、(╥﹏╥)、(._.)）或普通emoji，别用 ;) 这种西式的，全句最多带一个颜文字或emoji；`n" +
+              "5. 中文、口语、有网感、22字以内；只输出这一句话本身，不要引号、不要解释、不要多写第二句。"
     return (Invoke-Ai -Prompt $prompt)
 }
 
