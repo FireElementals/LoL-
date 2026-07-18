@@ -3,6 +3,8 @@ ai_config.json
 signatures.json
 signature.txt
 lcu_diag.txt
+sig_diag.txt
+sigdiag.ps1
 
 # 编译产物 —— 不进仓库历史，发布时走 GitHub Releases 附件
 *.exe
